@@ -9,16 +9,19 @@
 #include "pros/vision.h"
 #include <string>
 #define DEADZONE 15
-#define DIGITAL_SENSOR_PORT 'A'
+#define DIGITAL_SENSOR_PORT_A 'A'
+#define DIGITAL_SENSOR_PORT_B 'B'
 
 // Variables
 bool launcher_toggle = false, snarfer_toggle = false;
-int left_x, left_y, right_x, right_y, snarfer, firing_input, launcher;
+int left_x, left_y, right_x, right_y, snarfer, indexing_pneumatic_input, launcher;
 int forward_table[] = {-127,-125,-123,-121,-119,-117,-115,-113,-112,-110,-108,-106,-104,-102,-101,-99,-97,-95,-94,-92,-90,-88,-87,-85,-84,-82,-80,-79,-77,-76,-74,-73,-71,-70,-68,-67,-65,-64,-62,-61,-60,-58,-57,-56,-54,-53,-52,-50,-49,-48,-47,-45,-44,-43,-42,-41,-40,-39,-37,-36,-35,-34,-33,-32,-31,-30,-29,-28,-27,-26,-26,-25,-24,-23,-22,-21,-20,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-8,-8,-7,-7,-6,-6,-5,-5,-5,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,3,3,3,3,4,4,5,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,20,21,22,23,24,25,26,26,27,28,29,30,31,32,33,34,35,36,37,39,40,41,42,43,44,45,47,48,49,50,52,53,54,56,57,58,60,61,62,64,65,67,68,70,71,73,74,76,77,79,80,82,84,85,87,88,90,92,94,95,97,99,101,102,104,106,108,110,112,113,115,117,119,121,123,125,127};
 int turn_table[] = {-63,-62,-61,-60,-59,-58,-57,-56,-55,-54,-53,-53,-52,-51,-50,-49,-48,-47,-46,-46,-45,-44,-43,-42,-41,-41,-40,-39,-38,-38,-37,-36,-35,-35,-34,-33,-32,-32,-31,-30,-30,-29,-28,-28,-27,-26,-26,-25,-24,-24,-23,-23,-22,-21,-21,-20,-20,-19,-19,-18,-18,-17,-17,-16,-16,-15,-15,-14,-14,-13,-13,-12,-12,-11,-11,-11,-10,-10,-9,-9,-9,-8,-8,-8,-7,-7,-7,-6,-6,-6,-5,-5,-5,-5,-4,-4,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,7,7,7,8,8,8,9,9,9,10,10,11,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21,22,23,23,24,24,25,26,26,27,28,28,29,30,30,31,32,32,33,34,35,35,36,37,38,38,39,40,41,41,42,43,44,45,46,46,47,48,49,50,51,52,53,53,54,55,56,57,58,59,60,61,62,63};
 int launcher_cycle[] = {77,82,87,92,97,112, 117, 122, 127};
 int launcher_power = 8; // default power level
 bool one_stick = true;
+
+// autonomous movement
 float Wheel_Diameter = 4;
 float Wheel_Circumference = Wheel_Diameter * 3.1416;
 float Turning_Diameter = 14.6;
@@ -29,16 +32,20 @@ float Turn_Wheel_Rotation = 0;
 float Forward_Wheel_Rotation = 0;
 bool wait = false; 
 
-// Defining ports
-pros::Motor left_front_motor(1,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor right_front_motor(10,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor left_back_motor(11,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor right_back_motor(20,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor snarfer_motor(2);
-pros::Motor secondary_snarfer_motor(4);
-pros::Motor launcher_motor(13,pros::E_MOTOR_GEAR_BLUE, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor roller_motor(3);
-pros::ADIDigitalOut firing_pneumatic(DIGITAL_SENSOR_PORT);
+// Defining ports - drive
+pros::Motor left_front_motor(19,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor right_front_motor(11,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor left_back_motor(20,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor right_back_motor(12,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+
+// other
+pros::Motor snarfer_motor(1);
+pros::Motor launcher_motor(10,pros::E_MOTOR_GEAR_BLUE, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor roller_motor(9);
+
+// pneumatics
+pros::ADIAnalogOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_A);
+pros::ADIDigitalOut firing_pneumatic(DIGITAL_SENSOR_PORT_B);
 
 // Set motor groups
 pros::Motor_Group left_motors ({left_front_motor, left_back_motor});
@@ -70,9 +77,6 @@ void initialize() {
   left_back_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
   right_front_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
   right_back_motor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-  
-
-
 }
 
 /**
@@ -164,11 +168,11 @@ void move(float inches, float velocity) {
   wait = false;
 }
 void autonomous() {
-  pros::lcd::clear();v 
-  while (wait) {pros::delay(10);} turn(360, 100);
-  while (wait) {pros::delay(10);} move(48,100);
-  while (wait) {pros::delay(10);} turn(360,100);
-  while (wait) {pros::delay(10);} move(48,100);
+  // pros::lcd::clear();
+  // while (wait) {pros::delay(10);} turn(360, 100);
+  // while (wait) {pros::delay(10);} move(48,100);
+  // while (wait) {pros::delay(10);} turn(360,100);
+  // while (wait) {pros::delay(10);} move(48,100);
   
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -185,26 +189,25 @@ void autonomous() {
  */
 
 }
+
 // toggles for the pnuematics
-void firepnuematic() {
-  if ((firing_input == 1) && (launcher_toggle)) {
+void UpdateShooterPnuematic() {
+  if ((indexing_pneumatic_input == 1) && (launcher_toggle)) {
     firing_pneumatic.set_value(true);
     for (int i=0; i<70 ; i++) {
-      if ((firing_input == 1) && (launcher_toggle)){
+      if ((indexing_pneumatic_input == 1) && (launcher_toggle)){
         pros::delay(10);
       } else {
         firing_pneumatic.set_value(false);
-        //return;
-        i = 100; // just a high number to kill the for loop
+        break;
       }
     }
     firing_pneumatic.set_value(false);
     for (int i=0; i<70 ; i++) {
-      if ((firing_input == 1) && (launcher_toggle)){
+      if ((indexing_pneumatic_input == 1) && (launcher_toggle)){
         pros::delay(10);
       } else {
-        //return;
-        i = 100; // just a high number to kill the for loop
+        break;
       }
     }
   } else {
@@ -212,8 +215,19 @@ void firepnuematic() {
   }
 }
 
+// gate state: false = up, true = down
+bool gate_state_global = false;
+void RaiseLowerGate(bool gate_state){
+  if (gate_state == true){
+    gate_drop_pneumatic.set_value(true);
+  }
+  else{
+    gate_drop_pneumatic.set_value(false);
+  }
+}
+
 void opcontrol() {
-  firing_input = 0; // Stop auto firing pnuematic
+  indexing_pneumatic_input = 0; // Stop auto firing pnuematic
   while (true) {
     pros::lcd::clear();
     controller.clear();
@@ -223,21 +237,30 @@ void opcontrol() {
     left_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X));
     right_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y));
     right_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
-    firing_input = (controller.get_digital(pros::E_CONTROLLER_DIGITAL_Y));
+
+    // button presses - pneumatics
+    indexing_pneumatic_input = (controller.get_digital(pros::E_CONTROLLER_DIGITAL_Y));
+    if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)){
+      gate_state_global = !gate_state_global;
+    }
+
+    // display launcher motor stats
     pros::lcd::set_text(3, "Launching Motor Efficiency: " + std::to_string(launcher_motor.get_efficiency()));
     pros::lcd::set_text(4, "Launching Motor Temperature: " + std::to_string(launcher_motor.get_temperature()));
     pros::lcd::set_text(5, "Launching Motor Wattage: " + std::to_string(launcher_motor.get_power()));
 
     controller.set_text(1,1,"Power: ");//* + std::to_string(launcher_power[launcher_cycle]));
 
+    // toggle launcher power modes(using the up and down arrows on dpad)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP) && launcher_power < 8) {
       launcher_power += 1;
     }
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN) && launcher_power > 0) {
       launcher_power -= 1;
     }
+
     
-    // Toggle launcher (X)
+    // Toggle launcher (using the X button)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X) == 1) {
       launcher_toggle = !launcher_toggle;
     }
@@ -247,27 +270,21 @@ void opcontrol() {
       launcher_motor.move(0);
     }
 
+
     // Toggle snarfer (B)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B) == 1) {
       snarfer_toggle = !snarfer_toggle;
     }
     if (snarfer_toggle) {
-      snarfer_motor = -127;
-      if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_RIGHT)){
-        secondary_snarfer_motor = 127;
-      } else {
-        secondary_snarfer_motor = -127;
-      }
+      snarfer_motor = 127;
     } else {
       snarfer_motor = 0;
-      if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_RIGHT)){
-        secondary_snarfer_motor = 127;
-      } else {
-        secondary_snarfer_motor = 0;
-      }
     }
 
-    // Roller motor (R1/R2)
+
+    // ##########
+    // # ROLLER # (R1/R2)
+    // ##########
 
     if (!((controller.get_digital(DIGITAL_R1)) && (controller.get_digital(DIGITAL_R2)))) {
       if (controller.get_digital(DIGITAL_R1)) {
@@ -280,8 +297,10 @@ void opcontrol() {
     }
 
 
-    // Fire pnuematic (Y)
-    firepnuematic();
+    // Fire pnuematics!
+    UpdateShooterPnuematic();
+    RaiseLowerGate(gate_state_global);
+
 
     // Drive Control Loop (LEFT)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
