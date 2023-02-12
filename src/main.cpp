@@ -21,6 +21,7 @@ int turn_table[] = {-63,-62,-61,-60,-59,-58,-57,-56,-55,-54,-53,-53,-52,-51,-50,
 int launcher_cycle[] = {77, 82, 87, 92, 97, 112, 117, 122, 127};
 int launcher_power = 8; // default power level
 bool one_stick = true;
+int drive_dir = 1;
 
 // autonomous movement
 float Wheel_Diameter = 4;
@@ -274,8 +275,11 @@ void opcontrol() {
     //pros::lcd::set_text(3, "Launching Motor Efficiency: " + std::to_string(launcher_motor.get_efficiency()));
     //pros::lcd::set_text(4, "Launching Motor Temperature: " + std::to_string(launcher_motor.get_temperature()));
     //pros::lcd::set_text(5, "Launching Motor Wattage: " + std::to_string(launcher_motor.get_power()));
-
-    //controller.set_text(1,1,"Power: ");//* + std::to_string(launcher_power[launcher_cycle]));
+    int temp_power = launcher_cycle[launcher_power];
+    pros::lcd::print(6, "%d", temp_power);
+    for (int i = 0; i <=10; i++){
+      controller.print(0,4,"Power: %d", temp_power);
+    }
 
     // toggle launcher power modes(using the up and down arrows on dpad)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP) && launcher_power < 8) {
@@ -298,13 +302,15 @@ void opcontrol() {
 
 
     // Toggle snarfer (B)
-    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B) == 1) {
+    if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_B) == 1) {
       snarfer_toggle = !snarfer_toggle;
     }
     if (snarfer_toggle) {
       snarfer_motor = 127;
+      drive_dir = 1;
     } else {
       snarfer_motor = 0;
+      drive_dir = -1;
     }
 
 
@@ -332,8 +338,8 @@ void opcontrol() {
       one_stick = !one_stick;
     }
     if (one_stick){
-      left_motors.move(forward_table[left_x+127] + forward_table[left_y+127]);
-      right_motors.move(forward_table[left_x+127] - forward_table[left_y+127]);
+      left_motors.move(drive_dir*(forward_table[left_x+127] + forward_table[left_y+127]));
+      right_motors.move(drive_dir*(forward_table[left_x+127] - forward_table[left_y+127]));
       // pros::lcd::set_text(1, "Left Motors Speed: " + std::to_string(forward_table[left_x+127] + forward_table[left_y+127]));
       // pros::lcd::set_text(2, "Right Motors Speed: "+ std::to_string(forward_table[left_x+127] - forward_table[left_y+127]));
     
