@@ -14,7 +14,8 @@
 #define DIGITAL_SENSOR_PORT_C 'C'
 
 // Variables
-bool launcher_toggle = false, snarfer_toggle = false;
+bool launcher_toggle = false, snarfer_toggle = false, snarfer_reverse_toggle = false, snarf_updated = false, gate_updated = false;
+int snarf_dir = 1;
 int left_x, left_y, right_x, right_y, snarfer, indexing_pneumatic_input, launcher;
 int forward_table[] = {-127,-125,-123,-121,-119,-117,-115,-113,-112,-110,-108,-106,-104,-102,-101,-99,-97,-95,-94,-92,-90,-88,-87,-85,-84,-82,-80,-79,-77,-76,-74,-73,-71,-70,-68,-67,-65,-64,-62,-61,-60,-58,-57,-56,-54,-53,-52,-50,-49,-48,-47,-45,-44,-43,-42,-41,-40,-39,-37,-36,-35,-34,-33,-32,-31,-30,-29,-28,-27,-26,-26,-25,-24,-23,-22,-21,-20,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-8,-8,-7,-7,-6,-6,-5,-5,-5,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,3,3,3,3,4,4,5,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,20,21,22,23,24,25,26,26,27,28,29,30,31,32,33,34,35,36,37,39,40,41,42,43,44,45,47,48,49,50,52,53,54,56,57,58,60,61,62,64,65,67,68,70,71,73,74,76,77,79,80,82,84,85,87,88,90,92,94,95,97,99,101,102,104,106,108,110,112,113,115,117,119,121,123,125,127};
 int turn_table[] = {-63,-62,-61,-60,-59,-58,-57,-56,-55,-54,-53,-53,-52,-51,-50,-49,-48,-47,-46,-46,-45,-44,-43,-42,-41,-41,-40,-39,-38,-38,-37,-36,-35,-35,-34,-33,-32,-32,-31,-30,-30,-29,-28,-28,-27,-26,-26,-25,-24,-24,-23,-23,-22,-21,-21,-20,-20,-19,-19,-18,-18,-17,-17,-16,-16,-15,-15,-14,-14,-13,-13,-12,-12,-11,-11,-11,-10,-10,-9,-9,-9,-8,-8,-8,-7,-7,-7,-6,-6,-6,-5,-5,-5,-5,-4,-4,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,7,7,7,8,8,8,9,9,9,10,10,11,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21,22,23,23,24,24,25,26,26,27,28,28,29,30,30,31,32,32,33,34,35,35,36,37,38,38,39,40,41,41,42,43,44,45,46,46,47,48,49,50,51,52,53,53,54,55,56,57,58,59,60,61,62,63};
@@ -249,12 +250,13 @@ void opcontrol() {
     right_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
 
     // button presses - pneumatics
-    indexing_pneumatic_input = (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y));
+    indexing_pneumatic_input = (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2));
 
     // gate drop
-    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1)){
-      gate_state_global = !gate_state_global;
+    if (snarf_updated){
+      gate_state_global = !snarfer_toggle;
       gate_state_toggle = true;
+      snarf_updated = false;
     }
 
     if(gate_state_toggle){
@@ -266,6 +268,7 @@ void opcontrol() {
       }
       RaiseLowerGate(gate_state_global);
       gate_state_toggle = false;
+      gate_updated = true;
     }
 
     
@@ -291,7 +294,7 @@ void opcontrol() {
 
     
     // Toggle launcher (using the X button)
-    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_X) == 1) {
+    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1) == 1) {
       launcher_toggle = !launcher_toggle;
     }
     if (launcher_toggle) {
@@ -301,27 +304,40 @@ void opcontrol() {
     }
 
 
-    // Toggle snarfer (B)
-    if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_B) == 1) {
+    // Toggle snarfer (L1) Reverse direction (L2)
+    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1) == 1) {
       snarfer_toggle = !snarfer_toggle;
+      snarf_updated = true;
     }
-    if (snarfer_toggle) {
-      snarfer_motor = 127;
-      drive_dir = 1;
+    if (gate_updated){
+      pros::delay(500);
+      gate_updated = false;
+      if (snarfer_toggle) {
+        snarfer_motor = 127*snarf_dir;
+        drive_dir = 1;
+      } else {
+        snarfer_motor = 0;
+        drive_dir = -1;
+      }
+    }
+    
+    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2) == 1) {
+      snarfer_reverse_toggle = !snarfer_reverse_toggle;
+    }
+    if (snarfer_reverse_toggle) {
+      snarf_dir = -1;
     } else {
-      snarfer_motor = 0;
-      drive_dir = -1;
+      snarf_dir = 1;
     }
-
 
     // ##########
     // # ROLLER # (R1/R2)
     // ##########
 
-    if (!((controller.get_digital(DIGITAL_R1)) && (controller.get_digital(DIGITAL_R2)))) {
-      if (controller.get_digital(DIGITAL_R1)) {
+    if (!((controller.get_digital(DIGITAL_A)) && (controller.get_digital(DIGITAL_X)))) {
+      if (controller.get_digital(DIGITAL_A)) {
         roller_motor = -100;
-      } else if (controller.get_digital(DIGITAL_R2)) {
+      } else if (controller.get_digital(DIGITAL_X)) {
         roller_motor = 100;
       } else {
         roller_motor = 0;
@@ -332,14 +348,22 @@ void opcontrol() {
     // Fire pnuematics!
     UpdateShooterPnuematic();
 
+    // Endgame
+    // empty for now
 
     // Drive Control Loop (LEFT)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
       one_stick = !one_stick;
     }
     if (one_stick){
-      left_motors.move(drive_dir*(forward_table[left_x+127] + forward_table[left_y+127]));
-      right_motors.move(drive_dir*(forward_table[left_x+127] - forward_table[left_y+127]));
+      if (drive_dir == 1){
+        left_motors.move(forward_table[left_x+127] + forward_table[left_y+127]);
+        right_motors.move(forward_table[left_x+127] - forward_table[left_y+127]);
+      }
+      else{
+        left_motors.move((forward_table[left_x+127] - forward_table[left_y+127]));
+        right_motors.move((forward_table[left_x+127] + forward_table[left_y+127]));
+      }
       // pros::lcd::set_text(1, "Left Motors Speed: " + std::to_string(forward_table[left_x+127] + forward_table[left_y+127]));
       // pros::lcd::set_text(2, "Right Motors Speed: "+ std::to_string(forward_table[left_x+127] - forward_table[left_y+127]));
     
