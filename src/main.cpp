@@ -12,6 +12,7 @@
 #define DIGITAL_SENSOR_PORT_A 'A'
 #define DIGITAL_SENSOR_PORT_B 'B'
 #define DIGITAL_SENSOR_PORT_C 'C'
+#define DIGITAL_SENSOR_PORT_D 'D'
 
 // Variables
 bool launcher_toggle = false, snarfer_toggle = false, snarfer_reverse_toggle = false, snarf_updated = false, gate_updated = false;
@@ -19,8 +20,8 @@ int snarf_dir = 1;
 int left_x, left_y, right_x, right_y, snarfer, indexing_pneumatic_input, launcher;
 int forward_table[] = {-127,-125,-123,-121,-119,-117,-115,-113,-112,-110,-108,-106,-104,-102,-101,-99,-97,-95,-94,-92,-90,-88,-87,-85,-84,-82,-80,-79,-77,-76,-74,-73,-71,-70,-68,-67,-65,-64,-62,-61,-60,-58,-57,-56,-54,-53,-52,-50,-49,-48,-47,-45,-44,-43,-42,-41,-40,-39,-37,-36,-35,-34,-33,-32,-31,-30,-29,-28,-27,-26,-26,-25,-24,-23,-22,-21,-20,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-8,-8,-7,-7,-6,-6,-5,-5,-5,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,3,3,3,3,4,4,5,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,20,21,22,23,24,25,26,26,27,28,29,30,31,32,33,34,35,36,37,39,40,41,42,43,44,45,47,48,49,50,52,53,54,56,57,58,60,61,62,64,65,67,68,70,71,73,74,76,77,79,80,82,84,85,87,88,90,92,94,95,97,99,101,102,104,106,108,110,112,113,115,117,119,121,123,125,127};
 int turn_table[] = {-63,-62,-61,-60,-59,-58,-57,-56,-55,-54,-53,-53,-52,-51,-50,-49,-48,-47,-46,-46,-45,-44,-43,-42,-41,-41,-40,-39,-38,-38,-37,-36,-35,-35,-34,-33,-32,-32,-31,-30,-30,-29,-28,-28,-27,-26,-26,-25,-24,-24,-23,-23,-22,-21,-21,-20,-20,-19,-19,-18,-18,-17,-17,-16,-16,-15,-15,-14,-14,-13,-13,-12,-12,-11,-11,-11,-10,-10,-9,-9,-9,-8,-8,-8,-7,-7,-7,-6,-6,-6,-5,-5,-5,-5,-4,-4,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6,7,7,7,8,8,8,9,9,9,10,10,11,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18,19,19,20,20,21,21,22,23,23,24,24,25,26,26,27,28,28,29,30,30,31,32,32,33,34,35,35,36,37,38,38,39,40,41,41,42,43,44,45,46,46,47,48,49,50,51,52,53,53,54,55,56,57,58,59,60,61,62,63};
-int launcher_cycle[] = {77, 82, 87, 92, 97, 112, 117, 122, 127};
-int launcher_power = 8; // default power level
+int launcher_cycle[] = {87, 112, 127};
+int launcher_power = 2; // default power level
 bool one_stick = true;
 int drive_dir = 1;
 
@@ -50,6 +51,7 @@ pros::Motor roller_motor(7);
 pros::ADIDigitalOut gate_raise_pneumatic(DIGITAL_SENSOR_PORT_A);
 pros::ADIDigitalOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_B);
 pros::ADIDigitalOut firing_pneumatic(DIGITAL_SENSOR_PORT_C);
+pros::ADIDigitalOut endgame_release(DIGITAL_SENSOR_PORT_D);
 
 // Set motor groups
 pros::Motor_Group left_motors ({left_front_motor, left_back_motor});
@@ -171,7 +173,18 @@ void move(float inches, float velocity) {
 
   wait = false;
 }
+void auton2(){
+  roller_motor = 100;
+  left_motors.move(60);
+  right_motors.move(-60);
+  pros::delay(500);
+  roller_motor = 0;
+  left_motors.move(0);
+  right_motors.move(0);
+
+}
 void autonomous() {
+  auton2();
   // pros::lcd::clear();
   // while (wait) {pros::delay(10);} turn(360, 100);
   // while (wait) {pros::delay(10);} move(48,100);
@@ -285,7 +298,7 @@ void opcontrol() {
     }
 
     // toggle launcher power modes(using the up and down arrows on dpad)
-    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP) && launcher_power < 8) {
+    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP) && launcher_power < 2) {
       launcher_power += 1;
     }
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN) && launcher_power > 0) {
@@ -320,15 +333,6 @@ void opcontrol() {
         drive_dir = -1;
       }
     }
-    
-    if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L2) == 1) {
-      snarfer_reverse_toggle = !snarfer_reverse_toggle;
-    }
-    if (snarfer_reverse_toggle) {
-      snarf_dir = -1;
-    } else {
-      snarf_dir = 1;
-    }
 
     // ##########
     // # ROLLER # (R1/R2)
@@ -349,7 +353,12 @@ void opcontrol() {
     UpdateShooterPnuematic();
 
     // Endgame
-    // empty for now
+    if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_RIGHT)){
+      if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)){
+        // fire endgame!
+        endgame_release.set_value(true);
+      }
+    }
 
     // Drive Control Loop (LEFT)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
