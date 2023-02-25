@@ -287,23 +287,25 @@ void opcontrol() {
 
     // Indexer (R2)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)){
-      indexing = true;
+      if (!indexing){
+        if(indexer_limit_sensor.get_value()){
+          index_motor.move_relative(90,127);
+        }
+        else{
+          indexing=true;
+          index_motor.move_relative(10, 127);
+        }
+      }
     }
     if (indexing){
-      if(!indexer_limit_sensor.get_value()){
-        index_motor.move(100);
+      if (indexer_limit_sensor.get_value()){
+        indexing=false;
       }
       else{
-        index_motor.move(20);
-        pros::delay(100);
-        index_motor.brake();
-        indexing = false;
+        index_motor.move_relative(20,127);
       }
     }
-    else{
-      index_motor.brake();
-    }
-  
+    
     // Toggle snarfer (L1)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_L1) == 1) {
       snarfer_toggle = !snarfer_toggle;
