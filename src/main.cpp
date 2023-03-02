@@ -46,7 +46,7 @@ pros::Motor right_back_motor(12,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_E
 // other
 pros::Motor snarfer_motor(1);
 pros::Motor launcher_motor(10,pros::E_MOTOR_GEAR_BLUE, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor roller_motor(7);
+pros::Motor roller_motor(6);
 pros::Motor index_motor(2, pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
 
 // pneumatics
@@ -176,6 +176,7 @@ void move(float inches, float velocity) {
   wait = false;
 }
 void auton2(){
+  /*
   roller_motor = 100;
   left_motors.move(60);
   right_motors.move(-60);
@@ -183,6 +184,11 @@ void auton2(){
   roller_motor = 0;
   left_motors.move(0);
   right_motors.move(0);
+  */
+  roller_motor = 100;
+  left_motors.move(60);
+  right_motors.move(60);
+  roller_motor = 0;
 
 }
 void autonomous() {
@@ -212,7 +218,7 @@ void autonomous() {
 // toggles for the pnuematics
 // gate state: false = down, true = up
 bool gate_state_global = false;
-bool gate_state_toggle = true;
+bool gate_state_toggle = false;
 
 void RaiseLowerGate(bool gate_state){
   pros::lcd::print(1, "Raising/Lowering Gate");
@@ -261,10 +267,7 @@ void opcontrol() {
       RaiseLowerGate(gate_state_global);
       gate_state_toggle = false;
       gate_updated = true;
-    }
-
-    // display launcher motor power level on controller (not persistent)
-    controller.print(0,4,"Power: %d ", launcher_cycle[launcher_power]);
+    }    
 
     // toggle launcher power modes(using the up and down arrows on dpad)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_UP) && launcher_power < 2) {
@@ -284,6 +287,8 @@ void opcontrol() {
     } else {
       launcher_motor.move(0);
     }
+    // launcher info print on controller: single line if else
+    (launcher_toggle)? controller.print(0, 1, "ON  Power: %d ", launcher_cycle[launcher_power]) : controller.print(0, 1, "OFF             ");
 
     // Indexer (R2)
     if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R2)){
@@ -313,7 +318,7 @@ void opcontrol() {
     }
     // update our gate and snarfer states
     if (gate_updated){
-      pros::delay(500);
+      pros::delay(200); // make sure snarf turns on after the gate drops
       gate_updated = false;
       if (snarfer_toggle) {
         snarfer_motor = 127*snarf_dir;
