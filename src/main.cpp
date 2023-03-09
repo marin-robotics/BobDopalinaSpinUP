@@ -19,13 +19,17 @@ using namespace std;
 #define DIGITAL_SENSOR_PORT_D 'D'
 #define DIGITAL_SENSOR_PORT_E 'E'
 
+enum TEAM {RED, BLUE};
+TEAM selected_team = RED;
+
+bool team_red = true;
 
 // Variables
 bool launcher_toggle = false, snarfer_toggle = false;
 int left_x, left_y, right_x, right_y, snarfer, firing_input, launcher;
 int forward_table[] = {-127,-125,-123,-121,-119,-117,-115,-113,-112,-110,-108,-106,-104,-102,-101,-99,-97,-95,-94,-92,-90,-88,-87,-85,-84,-82,-80,-79,-77,-76,-74,-73,-71,-70,-68,-67,-65,-64,-62,-61,-60,-58,-57,-56,-54,-53,-52,-50,-49,-48,-47,-45,-44,-43,-42,-41,-40,-39,-37,-36,-35,-34,-33,-32,-31,-30,-29,-28,-27,-26,-26,-25,-24,-23,-22,-21,-20,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-8,-8,-7,-7,-6,-6,-5,-5,-5,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,3,3,3,3,4,4,5,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,20,21,22,23,24,25,26,26,27,28,29,30,31,32,33,34,35,36,37,39,40,41,42,43,44,45,47,48,49,50,52,53,54,56,57,58,60,61,62,64,65,67,68,70,71,73,74,76,77,79,80,82,84,85,87,88,90,92,94,95,97,99,101,102,104,106,108,110,112,113,115,117,119,121,123,125,127};
 int turn_table[] = {63,-61,-59,-57,-55,-54,-52,-50,-49,-47,-45,-44,-42,-41,-39,-38,-37,-35,-34,-33,-32,-31,-29,-28,-27,-26,-25,-24,-23,-22,-21,-21,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-9,-8,-8,-7,-7,-7,-6,-6,-5,-5,-5,-5,-4,-4,-4,-4,-3,-3,-3,-3,-3,-2,-2,-2,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,3,3,3,3,3,4,4,4,4,5,5,5,5,6,6,7,7,7,8,8,9,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,21,21,22,23,24,25,26,27,28,29,31,32,33,34,35,37,38,39,41,42,44,45,47,49,50,52,54,55,57,59,61,63};
-int launcher_cycle[] = {97,112, 117, 122, 127};
+int launcher_cycle[] = {250,300,350,450,500,550,600};
 int launcher_power = sizeof(launcher_cycle)/sizeof(launcher_cycle[0]) - 1; // default power level
 
 float Wheel_Diameter = 4;
@@ -39,6 +43,12 @@ bool wait = false;
 // New Code
 //bool indexing = false;
 bool standard_drive = true;
+float y_current, x_current, y_direction, x_direction;
+float y_true_step;
+float x_true_step;
+float up_step = 5;
+float down_step = -10;
+
 
 enum Snarfer_State {FORWARD, OFF, REVERSE};
 Snarfer_State current_direction = OFF;
@@ -53,10 +63,6 @@ pros::Motor launcher_motor(10,pros::E_MOTOR_GEAR_BLUE, false, pros::E_MOTOR_ENCO
 pros::Motor roller_motor(6);
 pros::Motor index_motor(2, pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
 
-// Defining Vision Sensors
-pros::Vision vision_A(18);
-pros::Vision vision_B(3);
-
 // Pneumatics
 pros::ADIDigitalOut gate_raise_pneumatic(DIGITAL_SENSOR_PORT_A);
 pros::ADIDigitalOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_B);
@@ -70,6 +76,29 @@ pros::Motor_Group right_motors ({right_front_motor, right_back_motor});
 
 // Controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
+
+// Defining Vision Sensors
+pros::Vision vision_A(18);
+pros::Vision vision_B(3);
+
+// Set Vision Signatures
+pros::vision_signature_s_t Red_A_signature = 
+vision_A.signature_from_utility(2, 5105, 6761, 5933, 699, 1629, 1164, 3.000, 0);
+pros::vision_signature_s_t Blue_A_signature = 
+vision_A.signature_from_utility(3, -3049, -2407, -2728, 9121, 10519, 9820, 3.000, 0);
+pros::vision_signature_s_t Red_B_signature = 
+vision_B.signature_from_utility(2, 5105, 6761, 5933, 699, 1629, 1164, 3.000, 0);
+pros::vision_signature_s_t Blue_B_signature = 
+vision_B.signature_from_utility(3, -3049, -2407, -2728, 9121, 10519, 9820, 3.000, 0);
+
+pros::vision_object_s_t red_A[10]; // Array containing the data from red objects seen by vision sensor A
+pros::vision_object_s_t blue_A[10]; // Array containing the data from blue objects seen by vision sensor A
+pros::vision_object_s_t red_B[10]; // Array containing the data from red objects seen by vision sensor B
+pros::vision_object_s_t blue_B[10]; // Array containing the data from blue objects seen by vision sensor B
+
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
 
 void on_center_button() {
 	static bool pressed = false;
@@ -141,6 +170,7 @@ bool check_left_thresholds(float left_goal, float threshold) {
   }
   return false;
 }
+
 bool check_right_thresholds(float right_goal, float threshold) {
   if ((right_front_motor.get_position() > right_goal+threshold) || right_front_motor.get_position() < right_goal-threshold) {
     return true;
@@ -150,6 +180,7 @@ bool check_right_thresholds(float right_goal, float threshold) {
   }
   return false;
 }
+
 void turn(float angle, float velocity){
   wait = true; // Stop turn from running multiple times simultaneously
   
@@ -170,6 +201,7 @@ void turn(float angle, float velocity){
   
   wait = false; // Allow the next movement request to run
 }
+
 // Pivot off left side
 void left_pivot_turn(float angle, float velocity){
   wait = true; // Stop turn from running multiple times simultaneously
@@ -188,6 +220,7 @@ void left_pivot_turn(float angle, float velocity){
   
   wait = false; // Allow the next movement request to run
 }
+
 void right_pivot_turn(float angle, float velocity){
   wait = true; // Stop turn from running multiple times simultaneously
   
@@ -205,6 +238,7 @@ void right_pivot_turn(float angle, float velocity){
   
   wait = false; // Allow the next movement request to run
 }
+
 void move(float inches, float velocity) { // Movement request to move the bot a set distance at a set speed.
   wait = true;
   
@@ -225,6 +259,7 @@ void move(float inches, float velocity) { // Movement request to move the bot a 
 
   wait = false;
 }
+
 void simple_fire(int delay) {
   wait = true;
   firing_pneumatic.set_value(true);
@@ -233,6 +268,7 @@ void simple_fire(int delay) {
   pros::delay(delay);
   wait = false;
 }
+
 void auto_roller(int delay, int move_velocity){
   wait = true;
   roller_motor = -127;
@@ -364,7 +400,6 @@ void auton2(){ // Shoot two on small area
 
   launcher_motor = 0; 
 }
-
 void auton3(){ // Face low goal, fire, then get roller
   launcher_motor = 100; pros::delay(1000);
 
@@ -397,7 +432,6 @@ void auton4(){ // Shoot two on small area
   pros::delay(1000);
 
 }
-
 void autonomous() {
   pros::lcd::clear();
   pros::lcd::set_text(1, "Starting"); 
@@ -448,20 +482,108 @@ void Toggle_Snarfer(bool reversed) {
   }
 }
 
+bool Primary_Vision_Sensor_A(){  
+  int sum_A = 0;
+  int sum_B = 0;
+  for (int i = 0; i < 11; i++) {
+    sum_A += (red_A[i].height * red_A[i].width);
+    sum_A += (blue_A[i].height * blue_A[i].width);
+    sum_B += (red_B[i].height * red_B[i].width);
+    sum_B += (blue_B[i].height * blue_B[i].width);
+  }
+  return sum_A > sum_B;
+}
+/*
+void Slew_Rate_Drive(){
+  float y_true_step;
+  float x_true_step;
+  float up_step = 5;
+  float down_step = -10;
+  float y_direction = abs(left_y) / left_y;
+  float x_direction = abs(left_x) / left_x;
+  int y_goal = pow((left_y / 127), 2) * 127;
+  int x_goal = pow((left_x / 127), 4) * 63; 
+  if (y_goal > y_current) {
+    y_true_step = up_step;
+  } else if (y_goal < y_current) {
+    y_true_step = down_step;
+  } else {
+    y_true_step = 0;
+  }
+  if (x_goal > x_current) {
+    x_true_step = up_step;
+  } else if (x_goal < x_current) {
+    x_true_step = down_step;
+  } else {
+    x_true_step = 0;
+  }
+  y_current += y_true_step;
+  x_current += x_true_step;
+  left_motors.move((y_current*y_direction)+(x_current*x_direction));
+  right_motors.move((y_current*y_direction)-(x_current*x_direction));
+  pros::lcd::set_text(1, "y_direction: " + std::to_string(y_direction));
+  pros::lcd::set_text(2, "y_goal: " + std::to_string(y_goal));
+  pros::lcd::set_text(3, "y_true_step: " + std::to_string(y_true_step));
+  pros::lcd::set_text(4, "y_current: " + std::to_string(y_current));
+  pros::lcd::set_text(5, "left_y: " + std::to_string(left_y));
+
+
+}
+*/
+
 void opcontrol() {
   firing_input = 0; // Stop auto firing pneumatic
   while (true) {
+
+    vision_A.read_by_sig(0, Red_A_signature.id, 11, red_A);
+    vision_A.read_by_sig(0, Blue_A_signature.id, 11, blue_A);
+    vision_B.read_by_sig(0, Red_B_signature.id, 11, red_B);
+    vision_B.read_by_sig(0, Blue_B_signature.id, 11, blue_B);
+
+    // Smart Roller code
+    if (selected_team == RED){ // IF TEAM RED
+      if (Primary_Vision_Sensor_A()) { // check which vision sensor to use based on most signatures detected
+        if ((blue_A[0].height > red_A[0].height) && (red_A[0].y_middle_coord > blue_A[0].y_middle_coord)) {
+          roller_motor = 127;
+        } else {
+          roller_motor = 0;
+        }
+      } else {
+        // same code but for other vision sensor
+        if ((blue_B[0].height > red_B[0].height) && (red_B[0].y_middle_coord > blue_B[0].y_middle_coord)) {
+          roller_motor = 127;
+        } else {
+          roller_motor = 0;
+        }
+      }
+    } else { // IF TEAM BLUE (NOT CHANGED YET)
+      if (Primary_Vision_Sensor_A()) { // check which vision sensor to use based on most signatures detected
+        if ((blue_A[0].height < red_A[0].height) && (red_A[0].y_middle_coord < blue_A[0].y_middle_coord)) {
+          roller_motor = 127;
+        } else {
+          roller_motor = 0;
+        }
+      } else {
+        // same code but for other vision sensor
+        if ((blue_B[0].height > red_B[0].height) && (red_B[0].y_middle_coord > blue_B[0].y_middle_coord)) {
+          roller_motor = 127;
+        } else {
+          roller_motor = 0;
+        }
+      }
+    }
+
     pros::lcd::clear();
     // Get joystick values
-    left_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y));
-    left_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X));
-    right_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y));
-    right_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
+    float left_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y));
+    float left_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X));
+    float right_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y));
+    float right_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
     firing_input = (controller.get_digital(DIGITAL_R1));
-    pros::lcd::set_text(3, "Launching Motor Efficiency: " + std::to_string(launcher_motor.get_efficiency()));
-    pros::lcd::set_text(4, "Launching Motor Temperature: " + std::to_string(launcher_motor.get_temperature()));
-    pros::lcd::set_text(5, "Launching Motor Wattage: " + std::to_string(launcher_motor.get_power()));
-    //controller.print(1, 1, "Power: " + std::to_string(launcher_power[launcher_cycle]), 0)
+    //pros::lcd::set_text(3, "Launching Motor Efficiency: " + std::to_string(launcher_motor.get_efficiency()));
+    //pros::lcd::set_text(4, "Launching Motor Temperature: " + std::to_string(launcher_motor.get_temperature()));
+    //pros::lcd::set_text(5, "Launching Motor Wattage: " + std::to_string(launcher_motor.get_power()));
+    // controller.print(1, 1, "Power: " + std::to_string(launcher_power[launcher_cycle]), 0)
 
     
 
@@ -477,10 +599,10 @@ void opcontrol() {
       launcher_toggle = !launcher_toggle;
     }
     if (launcher_toggle) {
-      launcher_motor.move(launcher_cycle[launcher_power]);
+      launcher_motor.move_velocity(launcher_cycle[launcher_power]);
       controller.print(0, 1, "ON  Power: %d ", launcher_cycle[launcher_power]);
     } else {
-      launcher_motor.move(0);
+      launcher_motor.move_velocity(0);
       controller.print(0, 1, "OFF             ");
     }
 
@@ -531,15 +653,46 @@ void opcontrol() {
       }
     }
 */
-    //Drive Control Loop (LEFT)
+    // Drive Control Loop (LEFT)
     if (standard_drive) {
-    left_motors.move(forward_table[left_x+127] + turn_table[left_y+127]);
-    right_motors.move(forward_table[left_x+127] - turn_table[left_y+127]);
-    pros::lcd::set_text(1, "Left Motors Speed: " + std::to_string(forward_table[left_x+127] + forward_table[left_y+127]));
-    pros::lcd::set_text(2, "Right Motors Speed: "+ std::to_string(forward_table[left_x+127] - forward_table[left_y+127]));
+      y_direction = sgn(left_y);
+      x_direction = sgn(left_x);
+      //float y_direction = abs(left_y) / left_y;
+      //float x_direction = abs(left_x) / left_x;
+      int y_goal = pow((left_y / 127), 2) * 127;
+      int x_goal = pow((left_x / 127), 4) * 63;
+      if (y_goal > y_current) {
+        y_true_step = up_step;
+      } else if (y_goal < y_current) {
+        y_true_step = down_step;
+      } else {
+        y_true_step = 0;
+      }
+      if (x_goal > x_current) {
+        x_true_step = up_step;
+      } else if (x_goal < x_current) {
+        x_true_step = down_step;
+      } else {
+        x_true_step = 0;
+      }
+      y_current += y_true_step;
+      x_current += x_true_step;
+      left_motors.move((y_current * y_direction) + (x_current * x_direction));
+      right_motors.move((y_current * y_direction) - (x_current * x_direction));
+      pros::lcd::set_text(1, "y_direction: " + std::to_string(y_direction));
+      pros::lcd::set_text(2, "y_goal: " + std::to_string(y_goal));
+      pros::lcd::set_text(3, "y_true_step: " + std::to_string(y_true_step));
+      pros::lcd::set_text(4, "y_current: " + std::to_string(y_current));
+      pros::lcd::set_text(5, "left_y: " + std::to_string(left_y));
+
+      /*
+      left_motors.move_velocity(forward_velocity + turn_velocity);
+      right_motors.move_velocity(forward_velocity - turn_velocity);
+      pros::lcd::set_text(1, "Left Motors Speed: " + std::to_string(forward_velocity + turn_velocity));
+      pros::lcd::set_text(2, "Right Motors Speed: "+ std::to_string(forward_velocity - turn_velocity));
+      */
     } else {
-      left_motors.move(forward_table[left_x+127] - turn_table[left_y+127]);
-      right_motors.move(forward_table[left_x+127] + turn_table[left_y+127]);
+      //reverse
     }
 
 
