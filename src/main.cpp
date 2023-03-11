@@ -46,12 +46,13 @@ bool standard_drive = true;
 float y_current, x_current, y_direction, x_direction;
 float y_true_step;
 float x_true_step;
-float up_step = 5;
-float down_step = -10;
+float up_step = 50;
+float down_step = -50;
+float turn_constant = 0.7;
 
 
 enum Snarfer_State {FORWARD, OFF, REVERSE};
-Snarfer_State current_direction = OFF;
+Snarfer_State current_snarfer_direction = OFF;
 
 // Defining Motors
 pros::Motor left_front_motor(19,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
@@ -305,17 +306,17 @@ void drop_gate(){
 void snarf_forward(){
   drop_gate();
   snarfer_motor = 127;
-  current_direction = FORWARD;
+  current_snarfer_direction = FORWARD;
 }
 void snarf_reverse(){
   drop_gate();
   snarfer_motor = -127;
-  current_direction = REVERSE;
+  current_snarfer_direction = REVERSE;
 }
 void snarf_stop(){
   snarfer_motor = 0;
   lift_gate();
-  current_direction = OFF;
+  current_snarfer_direction = OFF;
 }
 
 void auto_fire() {
@@ -610,20 +611,20 @@ void opcontrol() {
 
 
     if (controller.get_digital(DIGITAL_L1)) { // Normal Snarf Toggle
-      if(current_direction == FORWARD){ 
+      if(current_snarfer_direction == FORWARD){ 
         snarf_stop();
-      } else if (current_direction == OFF) {
+      } else if (current_snarfer_direction == OFF) {
         snarf_forward();
-      } else { // current_direction == REVERSE
+      } else { // current_snarfer_direction == REVERSE
         snarf_forward();
       }
     } 
     if (controller.get_digital(DIGITAL_B)) { // Reverse Snarf Toggle
-      if(current_direction == FORWARD){ 
+      if(current_snarfer_direction == FORWARD){ 
         snarf_reverse();
-      } else if (current_direction == OFF) {
+      } else if (current_snarfer_direction == OFF) {
         snarf_reverse();
-      } else { // current_direction == REVERSE
+      } else { // current_snarfer_direction == REVERSE
         snarf_stop();
       }
     } 
@@ -656,19 +657,26 @@ void opcontrol() {
     // Drive Control Loop (LEFT)
     if (standard_drive) {
       y_direction = sgn(left_y);
-      x_direction = sgn(left_x);
-      //float y_direction = abs(left_y) / left_y;
-      //float x_direction = abs(left_x) / left_x;
-      int y_goal = pow((left_y / 127), 2) * 127;
-      int x_goal = pow((left_x / 127), 4) * 63;
-      if (y_goal > y_current) {
+      x_direction = sgn(right_x);
+
+      float y_goal = powf((abs(left_y) / 127), 2) * 127;
+      float x_goal = powf((abs(right_x) / 127), (2-(y_goal/127*1.5))) * 127;
+
+      float y_error = y_goal - y_current;
+      float x_error = x_goal - x_current;
+
+      if (((up_step > y_error) && (y_error > 0)) || ((down_step < y_error) && (y_error <= 0))) {
+        y_true_step = y_error;
+      } else if (y_goal > y_current) {
         y_true_step = up_step;
       } else if (y_goal < y_current) {
         y_true_step = down_step;
       } else {
         y_true_step = 0;
       }
-      if (x_goal > x_current) {
+      if (((up_step > x_error) && (x_error > 0)) || ((down_step < x_error) && (x_error <= 0))) {
+        x_true_step = x_error;
+      } else if (x_goal > x_current) {
         x_true_step = up_step;
       } else if (x_goal < x_current) {
         x_true_step = down_step;
@@ -677,14 +685,20 @@ void opcontrol() {
       }
       y_current += y_true_step;
       x_current += x_true_step;
-      left_motors.move((y_current * y_direction) + (x_current * x_direction));
-      right_motors.move((y_current * y_direction) - (x_current * x_direction));
+      left_motors.move((y_current * y_direction) + turn_constant*(x_current * x_direction));
+      right_motors.move((y_current * y_direction) - turn_constant*(x_current * x_direction));
+      pros::lcd::set_text(1, "left_y: " + std::to_string(left_y));
+      pros::lcd::set_text(2, "right_x: " + std::to_string(right_x));
+      pros::lcd::set_text(3, "y_goal: " + std::to_string(y_goal));
+      pros::lcd::set_text(4, "x_goal: " + std::to_string(x_goal));
+      /*
       pros::lcd::set_text(1, "y_direction: " + std::to_string(y_direction));
       pros::lcd::set_text(2, "y_goal: " + std::to_string(y_goal));
       pros::lcd::set_text(3, "y_true_step: " + std::to_string(y_true_step));
       pros::lcd::set_text(4, "y_current: " + std::to_string(y_current));
       pros::lcd::set_text(5, "left_y: " + std::to_string(left_y));
-
+      */
+      
       /*
       left_motors.move_velocity(forward_velocity + turn_velocity);
       right_motors.move_velocity(forward_velocity - turn_velocity);
