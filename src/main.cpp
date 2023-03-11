@@ -65,10 +65,11 @@ pros::Motor roller_motor(6);
 pros::Motor index_motor(2, pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
 
 // Pneumatics
-pros::ADIDigitalOut gate_raise_pneumatic(DIGITAL_SENSOR_PORT_A);
-pros::ADIDigitalOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_B);
-pros::ADIDigitalOut firing_pneumatic(DIGITAL_SENSOR_PORT_C);
-pros::ADIDigitalIn indexer_limit_sensor(DIGITAL_SENSOR_PORT_D);
+//pros::ADIDigitalOut gate_raise_pneumatic(DIGITAL_SENSOR_PORT_A);
+//pros::ADIDigitalOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_B);
+//pros::ADIDigitalOut firing_pneumatic(DIGITAL_SENSOR_PORT_C);
+//pros::ADIDigitalIn indexer_limit_sensor(DIGITAL_SENSOR_PORT_D);
+pros::ADIDigitalOut net_launch(DIGITAL_SENSOR_PORT_B);
 pros::ADIDigitalOut endgame_fire(DIGITAL_SENSOR_PORT_E);
 
 // Set motor groups
@@ -125,7 +126,8 @@ void initialize() {
   right_front_motor.set_brake_mode(MOTOR_BRAKE_HOLD);
   right_back_motor.set_brake_mode(MOTOR_BRAKE_HOLD);
   index_motor.set_brake_mode(MOTOR_BRAKE_HOLD);
-  
+  net_launch.set_value(false);
+  endgame_fire.set_value(false);
 
 
 }
@@ -262,12 +264,11 @@ void move(float inches, float velocity) { // Movement request to move the bot a 
 }
 
 void simple_fire(int delay) {
-  wait = true;
-  firing_pneumatic.set_value(true);
-  pros::delay(600);
-  firing_pneumatic.set_value(false);
-  pros::delay(delay);
-  wait = false;
+  if ((firing_input == 1) && (launcher_toggle)) {
+    index_motor.move_relative(90,127);
+    pros::delay(delay);
+    index_motor.tare_position();
+  }
 }
 
 void auto_roller(int delay, int move_velocity){
@@ -352,7 +353,7 @@ void auto_fire() {
 }
 */
 
-void auton1(){ //Roller and 5 disks on wide area
+void auton1(){ // Roller and 5 disks on wide area
   launcher_motor = 100; 
   
   while (wait) {pros::delay(10);} auto_roller(400,60); pros::delay(400);
@@ -441,9 +442,7 @@ void autonomous() {
 
 
 
-  //while (wait) {pros::delay(10);} turn(-360, 100); pros::delay(1000);
 
-  
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -460,119 +459,15 @@ void autonomous() {
  */
 
 }
-// toggles for the pneumatics
-
-void Toggle_Snarfer(bool reversed) {
-  pros::lcd::print(1, "Raising/Lowering Gate");  
-  snarfer_toggle = !snarfer_toggle;
-  standard_drive = !snarfer_toggle;
-  if (snarfer_toggle == true){
-    gate_raise_pneumatic.set_value(false);
-    pros::delay(200);
-    gate_drop_pneumatic.set_value(true);
-    pros::delay(200);
-    snarfer_motor = 127;
-  }
-  else {
-    gate_drop_pneumatic.set_value(false);
-    pros::delay(200);
-    gate_raise_pneumatic.set_value(true);
-    pros::delay(200);
-    snarfer_motor = 0;
-
-  }
-}
-
-bool Primary_Vision_Sensor_A(){  
-  int sum_A = 0;
-  int sum_B = 0;
-  for (int i = 0; i < 11; i++) {
-    sum_A += (red_A[i].height * red_A[i].width);
-    sum_A += (blue_A[i].height * blue_A[i].width);
-    sum_B += (red_B[i].height * red_B[i].width);
-    sum_B += (blue_B[i].height * blue_B[i].width);
-  }
-  return sum_A > sum_B;
-}
-/*
-void Slew_Rate_Drive(){
-  float y_true_step;
-  float x_true_step;
-  float up_step = 5;
-  float down_step = -10;
-  float y_direction = abs(left_y) / left_y;
-  float x_direction = abs(left_x) / left_x;
-  int y_goal = pow((left_y / 127), 2) * 127;
-  int x_goal = pow((left_x / 127), 4) * 63; 
-  if (y_goal > y_current) {
-    y_true_step = up_step;
-  } else if (y_goal < y_current) {
-    y_true_step = down_step;
-  } else {
-    y_true_step = 0;
-  }
-  if (x_goal > x_current) {
-    x_true_step = up_step;
-  } else if (x_goal < x_current) {
-    x_true_step = down_step;
-  } else {
-    x_true_step = 0;
-  }
-  y_current += y_true_step;
-  x_current += x_true_step;
-  left_motors.move((y_current*y_direction)+(x_current*x_direction));
-  right_motors.move((y_current*y_direction)-(x_current*x_direction));
-  pros::lcd::set_text(1, "y_direction: " + std::to_string(y_direction));
-  pros::lcd::set_text(2, "y_goal: " + std::to_string(y_goal));
-  pros::lcd::set_text(3, "y_true_step: " + std::to_string(y_true_step));
-  pros::lcd::set_text(4, "y_current: " + std::to_string(y_current));
-  pros::lcd::set_text(5, "left_y: " + std::to_string(left_y));
-
-
-}
-*/
 
 void opcontrol() {
-  firing_input = 0; // Stop auto firing pneumatic
+  
+  // Stop auto firing pneumatics
+  firing_input = 0; 
+  net_launch.set_value(false);
+  endgame_fire.set_value(false);
+
   while (true) {
-
-    vision_A.read_by_sig(0, Red_A_signature.id, 11, red_A);
-    vision_A.read_by_sig(0, Blue_A_signature.id, 11, blue_A);
-    vision_B.read_by_sig(0, Red_B_signature.id, 11, red_B);
-    vision_B.read_by_sig(0, Blue_B_signature.id, 11, blue_B);
-
-    // Smart Roller code
-    if (selected_team == RED){ // IF TEAM RED
-      if (Primary_Vision_Sensor_A()) { // check which vision sensor to use based on most signatures detected
-        if ((blue_A[0].height > red_A[0].height) && (red_A[0].y_middle_coord > blue_A[0].y_middle_coord)) {
-          roller_motor = 127;
-        } else {
-          roller_motor = 0;
-        }
-      } else {
-        // same code but for other vision sensor
-        if ((blue_B[0].height > red_B[0].height) && (red_B[0].y_middle_coord > blue_B[0].y_middle_coord)) {
-          roller_motor = 127;
-        } else {
-          roller_motor = 0;
-        }
-      }
-    } else { // IF TEAM BLUE (NOT CHANGED YET)
-      if (Primary_Vision_Sensor_A()) { // check which vision sensor to use based on most signatures detected
-        if ((blue_A[0].height < red_A[0].height) && (red_A[0].y_middle_coord < blue_A[0].y_middle_coord)) {
-          roller_motor = 127;
-        } else {
-          roller_motor = 0;
-        }
-      } else {
-        // same code but for other vision sensor
-        if ((blue_B[0].height > red_B[0].height) && (red_B[0].y_middle_coord > blue_B[0].y_middle_coord)) {
-          roller_motor = 127;
-        } else {
-          roller_motor = 0;
-        }
-      }
-    }
 
     pros::lcd::clear();
     // Get joystick values
@@ -581,11 +476,11 @@ void opcontrol() {
     float right_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y));
     float right_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
     firing_input = (controller.get_digital(DIGITAL_R1));
-    //pros::lcd::set_text(3, "Launching Motor Efficiency: " + std::to_string(launcher_motor.get_efficiency()));
-    //pros::lcd::set_text(4, "Launching Motor Temperature: " + std::to_string(launcher_motor.get_temperature()));
-    //pros::lcd::set_text(5, "Launching Motor Wattage: " + std::to_string(launcher_motor.get_power()));
-    // controller.print(1, 1, "Power: " + std::to_string(launcher_power[launcher_cycle]), 0)
 
+    /* pros::lcd::set_text(3, "Launching Motor Efficiency: " + std::to_string(launcher_motor.get_efficiency()));
+    pros::lcd::set_text(4, "Launching Motor Temperature: " + std::to_string(launcher_motor.get_temperature()));
+    pros::lcd::set_text(5, "Launching Motor Wattage: " + std::to_string(launcher_motor.get_power()));
+    controller.print(1, 1, "Power: " + std::to_string(launcher_power[launcher_cycle]), 0) */
     
 
     if (controller.get_digital_new_press(DIGITAL_UP) && launcher_power < (sizeof(launcher_cycle)/sizeof(launcher_cycle[0])-1)) {
@@ -601,14 +496,13 @@ void opcontrol() {
     }
     if (launcher_toggle) {
       launcher_motor.move_velocity(launcher_cycle[launcher_power]);
-      controller.print(0, 1, "ON  Power: %d ", launcher_cycle[launcher_power]);
+      controller.print(0, 1, "Power: %d ", (launcher_cycle[launcher_power]/127));
     } else {
       launcher_motor.move_velocity(0);
       controller.print(0, 1, "OFF             ");
     }
 
     // Toggle snarfer (L1)
-
 
     if (controller.get_digital(DIGITAL_L1)) { // Normal Snarf Toggle
       if(current_snarfer_direction == FORWARD){ 
@@ -634,82 +528,88 @@ void opcontrol() {
     // Roller motor (A)
 
     if (controller.get_digital(DIGITAL_A)) {
-        roller_motor = -100;
+      roller_motor = -100;
     } else {
       roller_motor = 0;
     } 
 
 
-    // Fire pneumatic (R1)
+    // Launch Disk (R1)
     auto_fire();
-    if (controller.get_digital(DIGITAL_RIGHT) && (controller.get_digital(DIGITAL_Y))){
-      endgame_fire.set_value(true);
-    }
 
-/*
     // Fire net launcher
     if (controller.get_digital(DIGITAL_Y)){
       if (controller.get_digital(DIGITAL_LEFT)){
         net_launch.set_value(true);
       }
     }
-*/
-    // Drive Control Loop (LEFT)
-    if (standard_drive) {
-      y_direction = sgn(left_y);
-      x_direction = sgn(right_x);
 
-      float y_goal = powf((abs(left_y) / 127), 2) * 127;
-      float x_goal = powf((abs(right_x) / 127), (2-(y_goal/127*1.5))) * 127;
-
-      float y_error = y_goal - y_current;
-      float x_error = x_goal - x_current;
-
-      if (((up_step > y_error) && (y_error > 0)) || ((down_step < y_error) && (y_error <= 0))) {
-        y_true_step = y_error;
-      } else if (y_goal > y_current) {
-        y_true_step = up_step;
-      } else if (y_goal < y_current) {
-        y_true_step = down_step;
-      } else {
-        y_true_step = 0;
-      }
-      if (((up_step > x_error) && (x_error > 0)) || ((down_step < x_error) && (x_error <= 0))) {
-        x_true_step = x_error;
-      } else if (x_goal > x_current) {
-        x_true_step = up_step;
-      } else if (x_goal < x_current) {
-        x_true_step = down_step;
-      } else {
-        x_true_step = 0;
-      }
-      y_current += y_true_step;
-      x_current += x_true_step;
-      left_motors.move((y_current * y_direction) + turn_constant*(x_current * x_direction));
-      right_motors.move((y_current * y_direction) - turn_constant*(x_current * x_direction));
-      pros::lcd::set_text(1, "left_y: " + std::to_string(left_y));
-      pros::lcd::set_text(2, "right_x: " + std::to_string(right_x));
-      pros::lcd::set_text(3, "y_goal: " + std::to_string(y_goal));
-      pros::lcd::set_text(4, "x_goal: " + std::to_string(x_goal));
-      /*
-      pros::lcd::set_text(1, "y_direction: " + std::to_string(y_direction));
-      pros::lcd::set_text(2, "y_goal: " + std::to_string(y_goal));
-      pros::lcd::set_text(3, "y_true_step: " + std::to_string(y_true_step));
-      pros::lcd::set_text(4, "y_current: " + std::to_string(y_current));
-      pros::lcd::set_text(5, "left_y: " + std::to_string(left_y));
-      */
-      
-      /*
-      left_motors.move_velocity(forward_velocity + turn_velocity);
-      right_motors.move_velocity(forward_velocity - turn_velocity);
-      pros::lcd::set_text(1, "Left Motors Speed: " + std::to_string(forward_velocity + turn_velocity));
-      pros::lcd::set_text(2, "Right Motors Speed: "+ std::to_string(forward_velocity - turn_velocity));
-      */
-    } else {
-      //reverse
+    // Fire endgame (RIGHT + Y)
+    if (controller.get_digital(DIGITAL_RIGHT) && (controller.get_digital(DIGITAL_Y))){
+      endgame_fire.set_value(true);
     }
 
 
+
+
+
+    // Drive Control Loop (LEFT)
+
+    y_direction = sgn(left_y);
+    x_direction = sgn(right_x);
+
+    float y_goal = powf((abs(left_y) / 127), 2) * 127;
+    float x_goal = powf((abs(right_x) / 127), (2 - (y_goal / 127 * 1.5))) * 127;
+
+    float y_error = y_goal - y_current;
+    float x_error = x_goal - x_current;
+
+    if (((up_step > y_error) && (y_error > 0)) || ((down_step < y_error) && (y_error <= 0))) {
+      y_true_step = y_error;
+    } else if (y_goal > y_current) {
+      y_true_step = up_step;
+    } else if (y_goal < y_current) {
+      y_true_step = down_step;
+    } else {
+      y_true_step = 0;
+    }
+    if (((up_step > x_error) && (x_error > 0)) || ((down_step < x_error) && (x_error <= 0))) {
+      x_true_step = x_error;
+    } else if (x_goal > x_current) {
+      x_true_step = up_step;
+    } else if (x_goal < x_current) {
+      x_true_step = down_step;
+    } else {
+      x_true_step = 0;
+    }
+    y_current += y_true_step;
+    x_current += x_true_step;
+    if (standard_drive) {
+      left_motors.move((y_current * y_direction) + turn_constant * (x_current * x_direction));
+      right_motors.move((y_current * y_direction) - turn_constant * (x_current * x_direction));
+    } else {
+      left_motors.move((y_current * y_direction) - turn_constant * (x_current * x_direction));
+      right_motors.move((y_current * y_direction) + turn_constant * (x_current * x_direction));
+    }
+    pros::lcd::set_text(1, "left_y: " + std::to_string(left_y));
+    pros::lcd::set_text(2, "right_x: " + std::to_string(right_x));
+    pros::lcd::set_text(3, "y_goal: " + std::to_string(y_goal));
+    pros::lcd::set_text(4, "x_goal: " + std::to_string(x_goal));
+    /*
+    pros::lcd::set_text(1, "y_direction: " + std::to_string(y_direction));
+    pros::lcd::set_text(2, "y_goal: " + std::to_string(y_goal));
+    pros::lcd::set_text(3, "y_true_step: " + std::to_string(y_true_step));
+    pros::lcd::set_text(4, "y_current: " + std::to_string(y_current));
+    pros::lcd::set_text(5, "left_y: " + std::to_string(left_y));
+    */
+
+    /*
+    left_motors.move_velocity(forward_velocity + turn_velocity);
+    right_motors.move_velocity(forward_velocity - turn_velocity);
+    pros::lcd::set_text(1, "Left Motors Speed: " +
+    std::to_string(forward_velocity + turn_velocity)); pros::lcd::set_text(2,
+    "Right Motors Speed: "+ std::to_string(forward_velocity - turn_velocity));
+    */
 
     pros::delay(20);
   }
