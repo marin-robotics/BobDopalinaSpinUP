@@ -535,6 +535,7 @@ void opcontrol() {
     // Rumble Controller on target launch velocity
     if ((adjusting_launch_speed) && ((launcher_motor.get_actual_velocity() + fire_threshold) > launcher_cycle[launcher_power] > (launcher_motor.get_actual_velocity() - fire_threshold))) {
       controller.rumble(".");
+      adjusting_launch_speed = false;
     }
     // Launch Disk (R1)
     auto_fire();
