@@ -26,12 +26,12 @@ bool team_red = true;
 
 // Variables
 bool launcher_toggle = false, snarfer_toggle = false, adjusting_launch_speed = false;
-int left_x, left_y, right_x, right_y, snarfer, firing_input, launcher;
+int left_x, left_y, right_x, right_y, snarfer, launcher;
 int forward_table[] = {-127,-125,-123,-121,-119,-117,-115,-113,-112,-110,-108,-106,-104,-102,-101,-99,-97,-95,-94,-92,-90,-88,-87,-85,-84,-82,-80,-79,-77,-76,-74,-73,-71,-70,-68,-67,-65,-64,-62,-61,-60,-58,-57,-56,-54,-53,-52,-50,-49,-48,-47,-45,-44,-43,-42,-41,-40,-39,-37,-36,-35,-34,-33,-32,-31,-30,-29,-28,-27,-26,-26,-25,-24,-23,-22,-21,-20,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-8,-8,-7,-7,-6,-6,-5,-5,-5,-4,-4,-3,-3,-3,-3,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,3,3,3,3,4,4,5,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,20,21,22,23,24,25,26,26,27,28,29,30,31,32,33,34,35,36,37,39,40,41,42,43,44,45,47,48,49,50,52,53,54,56,57,58,60,61,62,64,65,67,68,70,71,73,74,76,77,79,80,82,84,85,87,88,90,92,94,95,97,99,101,102,104,106,108,110,112,113,115,117,119,121,123,125,127};
 int turn_table[] = {63,-61,-59,-57,-55,-54,-52,-50,-49,-47,-45,-44,-42,-41,-39,-38,-37,-35,-34,-33,-32,-31,-29,-28,-27,-26,-25,-24,-23,-22,-21,-21,-20,-19,-18,-17,-17,-16,-15,-15,-14,-13,-13,-12,-11,-11,-10,-10,-9,-9,-9,-8,-8,-7,-7,-7,-6,-6,-5,-5,-5,-5,-4,-4,-4,-4,-3,-3,-3,-3,-3,-2,-2,-2,-2,-2,-2,-2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,3,3,3,3,3,4,4,4,4,5,5,5,5,6,6,7,7,7,8,8,9,9,9,10,10,11,11,12,13,13,14,15,15,16,17,17,18,19,20,21,21,22,23,24,25,26,27,28,29,31,32,33,34,35,37,38,39,41,42,44,45,47,49,50,52,54,55,57,59,61,63};
 int launcher_cycle[] = {250,300,350,450,500,550,600};
 int launcher_power = sizeof(launcher_cycle)/sizeof(launcher_cycle[0]) - 1; // default power level
-int fire_threshold = 40;
+int fire_threshold = 20;
 
 float Wheel_Diameter = 4;
 float Wheel_Circumference = Wheel_Diameter * 3.1416;
@@ -56,23 +56,24 @@ enum Snarfer_State {FORWARD, OFF, REVERSE};
 Snarfer_State current_snarfer_direction = OFF;
 
 // Defining Motors
-pros::Motor left_front_motor(19,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor left_front_motor(20,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor right_front_motor(11,pros::E_MOTOR_GEAR_GREEN, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor left_back_motor(20,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor left_back_motor(19,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor right_back_motor(12,pros::E_MOTOR_GEAR_GREEN, true, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor snarfer_motor(1,pros::E_MOTOR_GEAR_GREEN, true, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor snarfer_motor(1,pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
 pros::Motor launcher_motor(10,pros::E_MOTOR_GEAR_BLUE, false, pros::E_MOTOR_ENCODER_DEGREES);
-pros::Motor roller_motor(6);
-pros::Motor index_motor(2, pros::E_MOTOR_GEAR_GREEN, false, pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor roller_motor(6,pros::E_MOTOR_GEAR_RED,true,pros::E_MOTOR_ENCODER_DEGREES);
+pros::Motor index_motor(2, pros::E_MOTOR_GEAR_GREEN, true, pros::E_MOTOR_ENCODER_DEGREES);
 
 // Pneumatics
-pros::ADIDigitalOut gate_raise_pneumatic(DIGITAL_SENSOR_PORT_A);
-pros::ADIDigitalOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_B);
+//pros::ADIDigitalOut gate_raise_pneumatic(DIGITAL_SENSOR_PORT_A);
+//pros::ADIDigitalOut gate_drop_pneumatic(DIGITAL_SENSOR_PORT_B);
 //pros::ADIDigitalOut firing_pneumatic(DIGITAL_SENSOR_PORT_C);
 //pros::ADIDigitalIn indexer_limit_sensor(DIGITAL_SENSOR_PORT_D);
+//pros::ADIDigitalOut gate_lift_pneumatic(DIGITAL_SENSOR_PORT_B);
 pros::ADIDigitalOut net_gate(DIGITAL_SENSOR_PORT_C);
-pros::ADIDigitalOut net_launch(DIGITAL_SENSOR_PORT_D);
-pros::ADIDigitalOut endgame_fire(DIGITAL_SENSOR_PORT_E);
+pros::ADIDigitalOut net_launch(DIGITAL_SENSOR_PORT_A);
+pros::ADIDigitalOut endgame_fire(DIGITAL_SENSOR_PORT_B);
 
 // Set motor groups
 pros::Motor_Group left_motors ({left_front_motor, left_back_motor});
@@ -105,13 +106,7 @@ template <typename T> int sgn(T val) {
 }
 
 void on_center_button() {
-	static bool pressed = false;
-	pressed = !pressed;
-	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
-	} else {
-		pros::lcd::clear_line(2);
-	}
+	endgame_fire.set_value(false);
 }
 
 /**
@@ -140,7 +135,7 @@ void initialize() {
  * the robot is enabled, this task will exit.
  */
 void disabled() {
-	
+	endgame_fire.set_value(false);
 }
 
 /**
@@ -152,7 +147,10 @@ void disabled() {
  * This task will exit when the robot is enabled and autonomous or opcontrol
  * starts.
  */
-void competition_initialize() {}
+void competition_initialize() {
+  endgame_fire.set_value(false);
+  endgame_fire.set_value(false);
+}
 
 /**
  * Runs the user autonomous code. This function will be started in its own task
@@ -266,12 +264,11 @@ void move(float inches, float velocity) { // Movement request to move the bot a 
 }
 
 void simple_fire(int delay) {
-  if ((firing_input == 1) && (launcher_toggle)) {
-    index_motor.move_relative(90,127);
-    pros::delay(delay);
-    index_motor.tare_position();
-  }
+  index_motor.move_relative(360,100);
+  pros::delay(delay);
+  index_motor.tare_position();
 }
+
 
 void auto_roller(int delay, int move_velocity){
   wait = true;
@@ -286,16 +283,22 @@ void auto_roller(int delay, int move_velocity){
 }
 
 void lift_gate() {
+  //gate_lift_pneumatic.set_value(true);
+  /*
   gate_drop_pneumatic.set_value(false);
   pros::delay(200);
   gate_raise_pneumatic.set_value(true);
   pros::delay(200);
+  */
 }
 void drop_gate(){
+  //gate_lift_pneumatic.set_value(false);
+  /*
   gate_raise_pneumatic.set_value(false);
   pros::delay(200);
   gate_drop_pneumatic.set_value(true);
   pros::delay(200);
+  */
 }
 void snarf_forward(){
   drop_gate();
@@ -314,9 +317,10 @@ void snarf_stop(){
 }
 
 void auto_fire() {
-  if ((firing_input == 1) && (launcher_toggle) && ((launcher_cycle[launcher_power] + fire_threshold)) > launcher_motor.get_actual_velocity() > (launcher_cycle[launcher_power] - fire_threshold)) {
-    index_motor.move_relative(360, 100);
-    while (index_motor.get_position() < 80) {
+  if (controller.get_digital(DIGITAL_R1) && (launcher_toggle) && ((launcher_cycle[launcher_power] + fire_threshold) > launcher_motor.get_actual_velocity()) && (launcher_motor.get_actual_velocity() > launcher_cycle[launcher_power] - fire_threshold)) {
+    pros::lcd::set_text(1, "Firing    ");
+    index_motor.move_relative(360, 127);
+    while (index_motor.get_position() < 350) {
       pros::delay(2);
     }
     index_motor.tare_position();
@@ -347,7 +351,7 @@ void auto_fire() {
 */
 
 void auton1(){ // Roller and 5 disks on wide area
-  launcher_motor.move_velocity(100); 
+  launcher_motor.move_velocity(470); 
   
   while (wait) {pros::delay(10);} auto_roller(400,60); pros::delay(400);
   
@@ -370,7 +374,7 @@ void auton1(){ // Roller and 5 disks on wide area
 
   while (wait) {pros::delay(10);} turn(90,50); pros::delay(1500);
 
-  launcher_motor.move_velocity(90); 
+  launcher_motor.move_velocity(425); 
   snarfer_motor = 0;
 
   pros::delay(1000);
@@ -385,7 +389,7 @@ void auton1(){ // Roller and 5 disks on wide area
 }
 void auton2(){ // Shoot two on small area
 
-  launcher_motor.move_velocity(80); pros::delay(1000);
+  launcher_motor.move_velocity(380); pros::delay(1000);
 
   simple_fire(1000);
   
@@ -396,7 +400,7 @@ void auton2(){ // Shoot two on small area
   launcher_motor.move_velocity(0); 
 }
 void auton3(){ // Face low goal, fire, then get roller
-  launcher_motor.move_velocity(100); pros::delay(1000);
+  launcher_motor.move_velocity(470); pros::delay(1000);
 
   simple_fire(800);
   
@@ -454,9 +458,8 @@ void autonomous() {
 }
 
 void opcontrol() {
-  
+  snarf_stop();
   // Stop auto firing pneumatics
-  firing_input = 0; 
   net_launch.set_value(false);
   endgame_fire.set_value(false);
 
@@ -468,7 +471,7 @@ void opcontrol() {
     float left_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X));
     float right_y = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y));
     float right_x = (controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X));
-    firing_input = (controller.get_digital(DIGITAL_R1));
+    // removed firing_input = (controller.get_digital(DIGITAL_R1));
 
     if (abs(right_x) < abs(left_x)) {
       right_x = left_x;
@@ -503,7 +506,7 @@ void opcontrol() {
 
     // Toggle snarfer (L1)
 
-    if (controller.get_digital(DIGITAL_L1)) { // Normal Snarf Toggle
+    if (controller.get_digital_new_press(DIGITAL_L1)) { // Normal Snarf Toggle
       if(current_snarfer_direction == FORWARD){ 
         snarf_stop();
       } else if (current_snarfer_direction == OFF) {
@@ -512,7 +515,7 @@ void opcontrol() {
         snarf_forward();
       }
     } 
-    if (controller.get_digital(DIGITAL_B)) { // Reverse Snarf Toggle
+    if (controller.get_digital_new_press(DIGITAL_L2)) { // Reverse Snarf Toggle
       if(current_snarfer_direction == FORWARD){ 
         snarf_reverse();
       } else if (current_snarfer_direction == OFF) {
@@ -533,7 +536,7 @@ void opcontrol() {
     } 
 
     // Rumble Controller on target launch velocity
-    if ((adjusting_launch_speed) && ((launcher_motor.get_actual_velocity() + fire_threshold) > launcher_cycle[launcher_power] > (launcher_motor.get_actual_velocity() - fire_threshold))) {
+    if ((adjusting_launch_speed) && ((launcher_cycle[launcher_power] + fire_threshold) > launcher_motor.get_actual_velocity()) && (launcher_motor.get_actual_velocity() > launcher_cycle[launcher_power] - fire_threshold)) {
       controller.rumble(".");
       adjusting_launch_speed = false;
     }
@@ -543,7 +546,7 @@ void opcontrol() {
     // Fire net launcher
     if (controller.get_digital(DIGITAL_UP) && (controller.get_digital(DIGITAL_X))){
       net_gate.set_value(true);
-      pros::delay(600);
+      pros::delay(1000);
       net_launch.set_value(true);
     }
 
@@ -596,7 +599,6 @@ void opcontrol() {
       left_motors.move((y_current * y_direction) - turn_constant * (x_current * x_direction));
       right_motors.move((y_current * y_direction) + turn_constant * (x_current * x_direction));
     }
-    pros::lcd::set_text(1, "left_y: " + std::to_string(left_y));
     pros::lcd::set_text(2, "right_x: " + std::to_string(right_x));
     pros::lcd::set_text(3, "y_goal: " + std::to_string(y_goal));
     pros::lcd::set_text(4, "x_goal: " + std::to_string(x_goal));
